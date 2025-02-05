@@ -6,7 +6,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ghcr.io/latex
+  IMAGE_NAME: ${{ github.REGISTRY }}/${{ github.repository }}
 
 jobs:
   build-and-push-image:
@@ -32,8 +32,8 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           flavor: |
-            latest=false
-            suffix=${{ matrix.scheme }}
+            latest=auto
+            suffix=-${{ matrix.scheme }}
           # tags: |
           #   type=raw,${{ matrix.scheme }}
 
