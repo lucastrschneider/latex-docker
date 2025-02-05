@@ -20,7 +20,7 @@ jobs:
 
     strategy:
       matrix:
-        scheme: ["basic", "small"] #, "medium", "full"]
+        scheme: ["basic", "small", "medium", "full"]
 
     steps:
       - name: Checkout github repository
@@ -55,5 +55,3 @@ jobs:
             SCHEME=scheme-${{ matrix.scheme }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          # cache-from: type=registry,ref=${{ steps.meta.outputs.tags }}
-          # cache-to: type=inline
