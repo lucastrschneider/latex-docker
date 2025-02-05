@@ -1,2 +1,3 @@
 # latex-docker
-LaTeX environment for dev container 
+
+Write LaTeX documents using LiveTeX and ChkTeX in a Dev Container.
