@@ -31,10 +31,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          flavor: |
-            latest=false
-          tags: |
-            type=raw,${{ matrix.scheme }}
+          flavor: latest=false
+          tags: type=raw,${{ matrix.scheme }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -55,3 +53,6 @@ jobs:
             SCHEME=scheme-${{ matrix.scheme }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ steps.meta.outputs.tags }}
+          cache-to: type=inline
