@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Delete old container images
-        uses: snok/container-retention-policy@v2
+        uses: snok/container-retention-policy@v3.0.0
         with:
           account: user
           token: ${{ secrets.GITHUB_TOKEN }}
