@@ -19,6 +19,6 @@ jobs:
           account: user
           token: ${{ secrets.GITHUB_TOKEN }}
           cut-off: 0s
-          image-names: ${{ github.repository }}
+          image-names: latex-docker
           tag-selection: untagged
           dry-run: true
