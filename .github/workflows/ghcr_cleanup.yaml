@@ -1,0 +1,24 @@
+name: GHCR Cleanup
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Runs every Sunday at midnight UTC
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  cleanup-ghcr:
+    runs-on: ubuntu-latest
+
+    permissions:
+      packages: write
+
+    steps:
+      - name: Delete old container images
+        uses: snok/container-retention-policy@v2
+        with:
+          account: user
+          token: ${{ secrets.GITHUB_TOKEN }}
+          cut-off: 0s
+          image-names: ${{ github.repository }}
+          tag-selection: untagged
+          dry-run: true
