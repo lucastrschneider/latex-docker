@@ -11,27 +11,29 @@
 ARG BASE_VERSION=noble
 
 ARG CHKTEX_VERSION=1.7.9
-
-ARG TEXDIR="/usr/local/texlive"
-ARG TEXUSERDIR="/texlive-user"
+ARG SCHEME="scheme-basic"
 
 ARG CHKTEX_MIRROR="http://download.savannah.gnu.org/releases/chktex"
 ARG TEXLIVE_MIRROR="https://mirror.ctan.org/systems/texlive/tlnet/install-tl-unx.tar.gz"
 
-ARG SCHEME="scheme-basic"
+ARG TEXDIR=/home/vscode/.local/share/texlive
+ARG TEXUSERDIR=/home/vscode/texmf
+
 ARG DOCFILES=0
 ARG SRCFILES=0
 
 ###############################################################################
 
 FROM mcr.microsoft.com/devcontainers/base:noble AS chktex-builder
+USER vscode
+
 ARG CHKTEX_MIRROR
 ARG CHKTEX_VERSION
 ENV DEBIAN_FRONTEND="noninteractive"
 
 SHELL [ "/bin/bash", "-c" ]
 
-WORKDIR /tmp/chktex-builder
+WORKDIR /tmp/chktex
 
 RUN curl -qfL -o- "${CHKTEX_MIRROR}/chktex-${CHKTEX_VERSION}.tar.gz" \
     | tar xz --strip-components 1
@@ -42,9 +44,11 @@ RUN make
 ###############################################################################
 
 FROM mcr.microsoft.com/vscode/devcontainers/base:${BASE_VERSION} AS tl-builder
-ARG TEXLIVE_MIRROR
+USER vscode
+
 ARG TEXDIR
 ARG TEXUSERDIR
+ARG TEXLIVE_MIRROR
 ARG SCHEME
 ARG DOCFILES
 ARG SRCFILES
@@ -55,11 +59,8 @@ ENV LANG="en_US.UTF-8"
 ENV LANGUAGE="en_US.UTF-8"
 ENV TERM="xterm"
 
-#* Running the following _should_ work, in principal, but Docker doesn't currently
-#*   support this form of execution.
-# ENV PATH ${TEXDIR}/bin/$(arch)-linux:${PATH}
-#!   c.f. https://github.com/docker/docker/issues/29110
-ENV PATH=${TEXDIR}/bin/aarch64-linux:${TEXDIR}/bin/x86_64-linux:${PATH}
+#! This prevents the `COPY --from=tl-builder ...` directives from failing.
+RUN mkdir -p $TEXDIR $TEXUSERDIR
 
 #! Move to /tmp/texlive so we can properly build and configure TeX, then clean-up
 WORKDIR /tmp/texlive
@@ -78,9 +79,6 @@ tlpdbopt_install_docfiles ${DOCFILES}
 tlpdbopt_install_srcfiles ${SRCFILES}
 EOF
 
-#! This prevents the `COPY --from=tl-builder ...` directives from failing.
-RUN mkdir -p "${TEXDIR}" "${TEXUSERDIR}"
-
 #* The installation process is essentially copy-paste of "tl;dr: Unix(ish)" from:
 #*   https://tug.org/texlive/quickinstall.html
 ENV TEXLIVE_INSTALL_NO_WELCOME=1
@@ -97,28 +95,8 @@ RUN perl ./install-tl \
 
 ###############################################################################
 
-FROM mcr.microsoft.com/devcontainers/base:${BASE_VERSION} AS output
-ENV DEBIAN_FRONTEND="noninteractive"
-ARG TEXDIR
-ARG TEXUSERDIR
-ARG CHKTEX_VERSION
-
-#! Set environment variables
-ENV LANG="en_US.UTF-8"
-ENV LANGUAGE="en_US.UTF-8"
-ENV TERM="xterm"
-
-#* Running the following _should_ work, in principal, but Docker doesn't currently
-#*   support this form of execution.
-# ENV PATH ${TEXDIR}/bin/$(arch)-linux:${PATH}
-#!   c.f. https://github.com/docker/docker/issues/29110
-ENV PATH=${TEXDIR}/bin/aarch64-linux:${TEXDIR}/bin/x86_64-linux:${PATH}
-
-SHELL [ "/bin/bash", "-c" ]
-
-COPY --from=chktex-builder /tmp/chktex-builder/chktex /usr/local/bin/chktex
-COPY --from=tl-builder "${TEXDIR}" "${TEXDIR}"
-COPY --from=tl-builder "${TEXUSERDIR}" "${TEXUSERDIR}"
+FROM mcr.microsoft.com/devcontainers/base:${BASE_VERSION} AS dependencies
+USER root
 
 #! Install base packages that users might need later on
 RUN <<EOF
@@ -143,6 +121,33 @@ apt autoremove -y
 rm -rf /var/lib/{apt,dpkg,cache,log}/
 EOF
 
+###############################################################################
+
+FROM dependencies AS output
+USER vscode
+
+ARG TEXDIR
+ARG TEXUSERDIR
+
+#! Set environment variables
+ENV DEBIAN_FRONTEND="noninteractive"
+ENV LANG="en_US.UTF-8"
+ENV LANGUAGE="en_US.UTF-8"
+ENV TERM="xterm"
+
+#* Running the following _should_ work, in principal, but Docker doesn't currently
+#*   support this form of execution.
+# ENV PATH ${TEXDIR}/bin/$(arch)-linux:${PATH}
+#!   c.f. https://github.com/docker/docker/issues/29110
+ENV PATH=${TEXDIR}/bin/aarch64-linux:${TEXDIR}/bin/x86_64-linux:$PATH
+
+SHELL [ "/bin/bash", "-c" ]
+
+# #! Copy build from previous stages
+COPY --from=chktex-builder /tmp/chktex/chktex /home/vscode/.local/bin/chktex
+COPY --from=tl-builder ${TEXDIR} ${TEXDIR}
+COPY --from=tl-builder ${TEXUSERDIR} ${TEXUSERDIR}
+
 #! Update the TexLive package manager and minimal packages
 RUN <<EOF
 tlmgr update --self --all
@@ -151,12 +156,7 @@ tlmgr update --all
 texhash
 EOF
 
-#! Check that the following commands work and have the right permissions
-RUN tlmgr version
-RUN latexmk -version
-RUN texhash --version
-RUN chktex --version
-
-WORKDIR /workspace
+USER vscode
+WORKDIR /workspaces
 
 ###############################################################################
